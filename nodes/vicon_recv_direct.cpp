@@ -85,6 +85,8 @@ private:
   string HostName;
   string SubjectName;
   string SegmentName;
+  string tf_ref_frame_id;
+  string tf_tracked_frame_id;
   double update_rate;
   // Timer
   ros::Timer updateTimer;
@@ -103,7 +105,8 @@ public:
   ViconReceiver() :
     nh_priv("~"), diag_updater(), min_freq(0.1), max_freq(1000),
         freq_status(diagnostic_updater::FrequencyStatusParam(&min_freq, &max_freq)), StreamMode("ClientPullPreFetch"),
-        HostName(""), SubjectName(""), SegmentName(""), update_rate(100)
+        HostName(""), SubjectName(""), SegmentName(""), tf_ref_frame_id("/enu"),
+        tf_tracked_frame_id("/pelican1/flyer_vicon"), update_rate(100)
   {
     // Diagnostics
     diag_updater.add("ViconReceiver Status", this, &ViconReceiver::diagnostics);
@@ -113,9 +116,11 @@ public:
     // Parameters
     nh_priv.param("stream_mode", StreamMode, StreamMode);
     nh_priv.param("datastream_hostport", HostName, HostName);
-    nh_priv.param("flyer_subject_name", SubjectName, SubjectName);
-    nh_priv.param("flyer_segment_name", SegmentName, SegmentName);
+    nh_priv.param("subject_name", SubjectName, SubjectName);
+    nh_priv.param("segment_name", SegmentName, SegmentName);
     nh_priv.param("update_rate", update_rate, update_rate);
+    nh_priv.param("tf_ref_frame_id", tf_ref_frame_id, tf_ref_frame_id);
+    nh_priv.param("tf_tracked_frame_id", tf_tracked_frame_id, tf_tracked_frame_id);
     ROS_ASSERT(init_vicon());
     // Service Server
     ROS_INFO("setting up grab_vicon_pose service server ... ");
@@ -246,7 +251,7 @@ private:
       flyer_transform.setRotation(
                                   tf::Quaternion(quat.Rotation[0], quat.Rotation[1], quat.Rotation[2], quat.Rotation[3]));
       tf_broadcast.sendTransform(tf::StampedTransform(flyer_transform, now_time - ros::Duration(latencyInMs / 1000),
-                                                      "/enu", ros::this_node::getNamespace() + "/flyer_vicon"));
+                                                      tf_ref_frame_id, tf_tracked_frame_id));
     }
 
     lastFrameNumber = OutputFrameNum.FrameNumber;

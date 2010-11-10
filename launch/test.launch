@@ -2,9 +2,10 @@
 	<node pkg="vicon_mocap" type="vicon_recv_direct" name="vicon_recv_direct">
 		<param name="stream_mode" value="ServerPush" type="str" />
 		<param name="datastream_hostport" value="10.32.43.3:801" type="str" />
-		<param name="flyer_subject_name" value="pelican1" type="str" />
-		<param name="flyer_segment_name" value="pelican1" type="str" />
-		<param name="get_camera_pose" value="false" type="bool" />
+		<param name="subject_name" value="pelican1" type="str" />
+		<param name="segment_name" value="pelican1" type="str" />
+		<param name="tf_ref_frame_id" value="/enu" type="str" />
+		<param name="tf_tracked_frame_id" value="/pelican1/flyer_vicon" type="str" />
 		<param name="update_rate" value="30" type="double" />
 	</node>
 </launch>
