@@ -85,9 +85,6 @@ private:
   string HostName;
   string SubjectName;
   string SegmentName;
-  string CameraSubjectName;
-  string CameraSegmentName;
-  bool get_camera_pose;
   double update_rate;
   // Timer
   ros::Timer updateTimer;
@@ -95,7 +92,6 @@ private:
   tf::TransformBroadcaster tf_broadcast;
   //geometry_msgs::PoseStamped vicon_pose;
   tf::Transform flyer_transform;
-  tf::Transform camera_transform;
   ros::Time now_time;
   // TODO: Make the following configurable:
   ros::ServiceServer m_grab_vicon_pose_service_server;
@@ -107,8 +103,7 @@ public:
   ViconReceiver() :
     nh_priv("~"), diag_updater(), min_freq(0.1), max_freq(1000),
         freq_status(diagnostic_updater::FrequencyStatusParam(&min_freq, &max_freq)), StreamMode("ClientPullPreFetch"),
-        HostName(""), SubjectName(""), SegmentName(""), CameraSubjectName(""), CameraSegmentName(""),
-        get_camera_pose(false), update_rate(100)
+        HostName(""), SubjectName(""), SegmentName(""), update_rate(100)
   {
     // Diagnostics
     diag_updater.add("ViconReceiver Status", this, &ViconReceiver::diagnostics);
@@ -120,9 +115,6 @@ public:
     nh_priv.param("datastream_hostport", HostName, HostName);
     nh_priv.param("flyer_subject_name", SubjectName, SubjectName);
     nh_priv.param("flyer_segment_name", SegmentName, SegmentName);
-    nh_priv.param("camera_subject_name", CameraSubjectName, CameraSubjectName);
-    nh_priv.param("camera_segment_name", CameraSegmentName, CameraSegmentName);
-    nh_priv.param("get_camera_pose", get_camera_pose, get_camera_pose);
     nh_priv.param("update_rate", update_rate, update_rate);
     ROS_ASSERT(init_vicon());
     // Service Server
@@ -177,15 +169,16 @@ private:
     else if (StreamMode == "ClientPullPreFetch")
     {
       MyClient.SetStreamMode(StreamMode::ClientPullPreFetch);
-    } else {
+    }
+    else
+    {
       ROS_FATAL("Unknown stream mode -- options are ServerPush, ClientPull, ClientPullPreFetch");
       ros::shutdown();
     }
     MyClient.SetAxisMapping(Direction::Forward, Direction::Left, Direction::Up); // 'Z-up'
     Output_GetAxisMapping _Output_GetAxisMapping = MyClient.GetAxisMapping();
-    ROS_INFO_STREAM("Axis Mapping: X-" << Adapt( _Output_GetAxisMapping.XAxis )
-        << " Y-" << Adapt( _Output_GetAxisMapping.YAxis )
-        << " Z-" << Adapt( _Output_GetAxisMapping.ZAxis ));
+    ROS_INFO_STREAM("Axis Mapping: X-" << Adapt(_Output_GetAxisMapping.XAxis) << " Y-"
+        << Adapt(_Output_GetAxisMapping.YAxis) << " Z-" << Adapt(_Output_GetAxisMapping.ZAxis));
     Output_GetVersion _Output_GetVersion = MyClient.GetVersion();
     ROS_INFO_STREAM("Version: " << _Output_GetVersion.Major << "." << _Output_GetVersion.Minor << "."
         << _Output_GetVersion.Point);
@@ -236,7 +229,8 @@ private:
       {
         droppedFrameCount += frameDiff;
         double droppedFramePct = (double)droppedFrameCount / frameCount * 100;
-        ROS_DEBUG_STREAM(frameDiff << " more (total " << droppedFrameCount << "/" << frameCount << ", " << droppedFramePct << "%) frame(s) dropped. Consider adjusting rates.");
+        ROS_DEBUG_STREAM(frameDiff << " more (total " << droppedFrameCount << "/" << frameCount << ", "
+            << droppedFramePct << "%) frame(s) dropped. Consider adjusting rates.");
       }
     }
     double latencyInMs = MyClient.GetLatencyTotal().Total * 1000;
@@ -255,21 +249,6 @@ private:
                                                       "/enu", ros::this_node::getNamespace() + "/flyer_vicon"));
     }
 
-    if (get_camera_pose)
-    {
-      // Camera:
-      trans = MyClient.GetSegmentGlobalTranslation(CameraSubjectName, CameraSegmentName);
-      quat = MyClient.GetSegmentGlobalRotationQuaternion(CameraSubjectName, CameraSegmentName);
-      if ((!trans.Occluded) && (!quat.Occluded))
-      {
-        camera_transform.setOrigin(tf::Vector3(trans.Translation[0] / 1000, trans.Translation[1] / 1000,
-                                               trans.Translation[2] / 1000));
-        camera_transform.setRotation(tf::Quaternion(quat.Rotation[0], quat.Rotation[1], quat.Rotation[2],
-                                                    quat.Rotation[3]));
-        tf_broadcast.sendTransform(tf::StampedTransform(camera_transform, now_time - ros::Duration(latencyInMs / 1000),
-                                                        "/enu", ros::this_node::getNamespace() + "/camera_vicon"));
-      }
-    }
     lastFrameNumber = OutputFrameNum.FrameNumber;
     return true;
   }
@@ -305,7 +284,7 @@ private:
       }
       catch (tf::TransformException ex)
       {
-        ROS_ERROR("%s",ex.what());
+        ROS_ERROR("%s", ex.what());
         return false; // TODO: should we really bail here, or just try again?
       }
     }
