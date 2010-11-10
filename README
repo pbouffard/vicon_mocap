@@ -7,6 +7,9 @@ Vicon DataStream SDK
 - libViconDataStreamSDK_CPP.so should be somewhere the linker can find it, e.g. /usr/local/lib
 ROS C-Turtle
 
+QUICK START
+roslaunch vicon_mocap test.launch
+
 OPERATION
 The vicon_recv_direct node initiates a connection with the Vicon data source (e.g. Nexus or Tracker)
 via the DataStream API. The parameter ~hostname should be set to the IP address and port (joined with a colon)
