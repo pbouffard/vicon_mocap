@@ -1,0 +1,4 @@
+link_directories(${PROJECT_SOURCE_DIR}/lib)
+rosbuild_add_executable(vicon_recv_direct vicon_recv_direct.cpp)
+target_link_libraries(vicon_recv_direct ViconDataStreamSDK_CPP)
+

@@ -1,0 +1,17 @@
+<package>
+  <description brief="vicon_mocap">
+
+     vicon_mocap
+
+  </description>
+  <author>Patrick Bouffard</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/vicon_mocap</url>
+  <depend package="tf"/>
+  <depend package="geometry_msgs"/>
+  <depend package="diagnostic_updater"/>
+  
+</package>
+
+

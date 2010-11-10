@@ -1,0 +1,8 @@
+build/
+bin/
+*~
+msg_gen/
+srv_gen/
+.project
+src/vicon_mocap/
+srv/lisp/
