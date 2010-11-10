@@ -6,3 +6,5 @@ srv_gen/
 .project
 src/vicon_mocap/
 srv/lisp/
+.rsync-exclude
+rsync_to_pelican.bsh
