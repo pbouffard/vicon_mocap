@@ -290,6 +290,7 @@ private:
       catch (tf::TransformException ex)
       {
         ROS_ERROR("%s", ex.what());
+        resp.success = false;
         return false; // TODO: should we really bail here, or just try again?
       }
     }
@@ -310,6 +311,7 @@ private:
     }
 
     // copy what we used to service call response:
+    resp.success = true;
     resp.pose.header.stamp = ros::Time::now();
     resp.pose.pose.position.x = normalized_vector[0];
     resp.pose.pose.position.y = normalized_vector[1];
