@@ -38,7 +38,7 @@
 #include <diagnostic_updater/update_functions.h>
 #include <tf/tf.h>
 #include <tf/transform_broadcaster.h>
-#include <geometry_msgs/PoseStamped.h>
+#include <geometry_msgs/TransformStamped.h>
 #include <vicon_mocap/viconGrabPose.h>
 #include <iostream>
 #include <algorithm>
@@ -88,6 +88,9 @@ private:
   string tf_ref_frame_id;
   string tf_tracked_frame_id;
   double update_rate;
+  double vicon_capture_rate;
+  // Publisher
+  ros::Publisher pose_pub;
   // Timer
   ros::Timer updateTimer;
   // TF Broadcaster
@@ -100,13 +103,17 @@ private:
   ViconDataStreamSDK::CPP::Client MyClient;
   double max_period_between_updates;
   double last_callback_duration;
+  unsigned int lastFrameNumber;
+  unsigned int frameCount;
+  unsigned int droppedFrameCount;
 
 public:
   ViconReceiver() :
     nh_priv("~"), diag_updater(), min_freq(0.1), max_freq(1000),
         freq_status(diagnostic_updater::FrequencyStatusParam(&min_freq, &max_freq)), StreamMode("ClientPullPreFetch"),
         HostName(""), SubjectName(""), SegmentName(""), tf_ref_frame_id("/enu"),
-        tf_tracked_frame_id("/pelican1/flyer_vicon"), update_rate(100)
+        tf_tracked_frame_id("/pelican1/flyer_vicon"), update_rate(100), vicon_capture_rate(50), lastFrameNumber(0),
+        frameCount(0), droppedFrameCount(0)
   {
     // Diagnostics
     diag_updater.add("ViconReceiver Status", this, &ViconReceiver::diagnostics);
@@ -119,6 +126,7 @@ public:
     nh_priv.param("subject_name", SubjectName, SubjectName);
     nh_priv.param("segment_name", SegmentName, SegmentName);
     nh_priv.param("update_rate", update_rate, update_rate);
+    nh_priv.param("vicon_capture_rate", vicon_capture_rate, vicon_capture_rate);
     nh_priv.param("tf_ref_frame_id", tf_ref_frame_id, tf_ref_frame_id);
     nh_priv.param("tf_tracked_frame_id", tf_tracked_frame_id, tf_tracked_frame_id);
     ROS_ASSERT(init_vicon());
@@ -126,6 +134,8 @@ public:
     ROS_INFO("setting up grab_vicon_pose service server ... ");
     m_grab_vicon_pose_service_server = nh_priv.advertiseService("grab_vicon_pose",
                                                                 &ViconReceiver::grab_vicon_pose_callback, this);
+    // Publisher
+    pose_pub = nh_priv.advertise<geometry_msgs::TransformStamped> ("output", 1);
     // Timer
     double update_timer_period = 1 / update_rate;
     min_freq = 0.95 * update_rate;
@@ -144,6 +154,9 @@ private:
     stat.summary(diagnostic_msgs::DiagnosticStatus::OK, "OK");
     stat.add("max period between updates", max_period_between_updates);
     stat.add("latest callback runtime", last_callback_duration);
+    stat.add("latest VICON frame number", lastFrameNumber);
+    stat.add("dropped frames", droppedFrameCount);
+    stat.add("framecount", frameCount);
   }
 
   bool init_vicon()
@@ -219,17 +232,15 @@ private:
 
   bool process_frame()
   {
-    static unsigned int lastFrameNumber = 0;
-    static unsigned int frameCount = 0;
-    static unsigned int droppedFrameCount = 0;
-
+    static ros::Time lastTime;
     Output_GetFrameNumber OutputFrameNum = MyClient.GetFrameNumber();
-    frameCount++;
+    //frameCount++;
     //ROS_INFO_STREAM("Grabbed a frame: " << OutputFrameNum.FrameNumber);
+    int frameDiff = 0;
     if (lastFrameNumber != 0)
     {
-      int frameDiff = OutputFrameNum.FrameNumber - lastFrameNumber;
-      frameCount += (frameDiff - 1);
+      frameDiff = OutputFrameNum.FrameNumber - lastFrameNumber;
+      frameCount += frameDiff;
       if ((frameDiff) > 1)
       {
         droppedFrameCount += frameDiff;
@@ -250,8 +261,24 @@ private:
                                             trans.Translation[2] / 1000));
       flyer_transform.setRotation(
                                   tf::Quaternion(quat.Rotation[0], quat.Rotation[1], quat.Rotation[2], quat.Rotation[3]));
-      tf_broadcast.sendTransform(tf::StampedTransform(flyer_transform, now_time - ros::Duration(latencyInMs / 1000),
-                                                      tf_ref_frame_id, tf_tracked_frame_id));
+      ros::Time thisTime = now_time - ros::Duration(latencyInMs / 1000);
+      tf::StampedTransform transform = tf::StampedTransform(flyer_transform, thisTime, tf_ref_frame_id,
+                                                            tf_tracked_frame_id);
+      tf_broadcast.sendTransform(transform);
+
+      geometry_msgs::TransformStamped pose_msg;
+      tf::transformStampedTFToMsg(transform, pose_msg);
+      double dt_from_clock = (thisTime - lastTime).toSec();
+      double dt_from_framediff = (1 / vicon_capture_rate) * frameDiff; // how much time there *should* be between the last frame and this one
+      if (fabs(1 - dt_from_clock / dt_from_framediff) < 0.5)
+      {
+        pose_pub.publish(pose_msg);
+      }
+      else
+      {
+        ROS_WARN_STREAM("Did not publish: dt_from_clock=" << dt_from_clock << " dt_from_framediff=" << dt_from_framediff);
+      }
+      lastTime = pose_msg.header.stamp;
     }
 
     lastFrameNumber = OutputFrameNum.FrameNumber;
